@@ -59,7 +59,7 @@ function Invoke-DeployCommand {
     Write-Host "  >> $Executable $($Arguments -join ' ')" -ForegroundColor DarkGray
     & $Executable @Arguments
     if ($LASTEXITCODE -ne 0) {
-        throw "Perintah gagal (exit $LASTEXITCODE): $Executable $($Arguments -join ' ')"
+        throw "Perintah gagal, exit code $LASTEXITCODE`: $Executable $($Arguments -join ' ')"
     }
 }
 
@@ -123,7 +123,7 @@ function Sync-DeployFromGitHub {
     & git reset --hard "origin/$($script:DeployGitBranch)"
     if ($LASTEXITCODE -ne 0) { throw "git reset gagal" }
 
-    Write-Host "  >> git clean -fd (kecuali .env, storage)"
+    Write-Host '  >> git clean -fd (kecuali .env, storage)'
     & git clean -fd -e .env -e storage -e ".deploy-backup"
     if ($LASTEXITCODE -ne 0) { Write-DeployWarn "git clean mengembalikan peringatan" }
 

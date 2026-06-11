@@ -15,10 +15,6 @@ Write-Host "========================================"
 Write-Host "Folder: $script:DeployAppDir"
 Write-Host ""
 
-if (-not (Test-Path ".env")) {
-    throw ".env wajib sudah ada. Instalasi pertama: deploy\install.ps1"
-}
-
 $php = Get-DeployPhp
 $composer = Get-DeployComposer
 Write-Host "PHP: $php"
@@ -28,6 +24,10 @@ $total = 3
 
 Write-DeployStep 1 $total "Sinkron kode dari GitHub"
 Sync-DeployFromGitHub
+
+if (-not (Test-Path ".env")) {
+    throw '.env wajib sudah ada. Instalasi pertama: deploy\install.ps1'
+}
 
 Write-DeployStep 2 $total "Composer + migrate + cache"
 Invoke-DeployBuild -Php $php -Composer $composer
