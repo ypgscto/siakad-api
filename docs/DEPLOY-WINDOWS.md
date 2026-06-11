@@ -93,4 +93,19 @@ Lihat: https://github.com/ypgscto/siakad-feeder/blob/main/docs/DEPLOY-RELEASE.md
 | HTTP 404 HTML (bukan JSON) | Akses lewat `.../siakad-api/public/` — upload `web.config` + `.htaccess` |
 | Deploy pakai PHP 8.3 | Set `SIAKAD_API_PHP` ke path php-8.2 |
 | `git fetch` gagal | Cek internet / credential GitHub |
+| Skrip lama error `aplikasi` not recognized | PowerShell salah parse teks `(aplikasi lama)`. Jalankan manual git di bawah, lalu `deploy\update.ps1` |
+
+### Recovery — skrip deploy versi lama
+
+```powershell
+cd C:\webserver\www\siakad-api
+git init
+git remote add origin https://github.com/ypgscto/siakad-api.git
+git fetch origin main
+git checkout -B main origin/main
+git reset --hard origin/main
+powershell -ExecutionPolicy Bypass -File deploy\update.ps1
+```
+
+Atau jika sudah ada `.git`: `powershell -ExecutionPolicy Bypass -File deploy\bootstrap-git.ps1`
 | Feeder HP kosong | Pastikan API sudah versi terbaru (field `handphone` di mahasiswa-sync) |
