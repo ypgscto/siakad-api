@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Rencana perluasan REST siakad-api untuk konsumsi SiFeeder Laravel. Bukan kontrak terpasang otomatis—implementasi mengikuti versi API Anda.",
+  "basePath": "/api",
+  "auth": {
+    "middleware": "siakad.token",
+    "header": "Sesuai EnsureSiakadApiToken / konfigurasi proyek"
+  },
+  "existingEndpoints": [
+    { "method": "GET", "path": "/health", "query": {}, "note": "Bisa di luar grup token" },
+    { "method": "GET", "path": "/semester-aktif", "query": {}, "note": "TahunID unik (DISTINCT), semua baris tahun tanpa filter NA" },
+    { "method": "GET", "path": "/angkatan-mahasiswa", "query": {}, "note": "Angkatan 4 digit dari mhsw.TahunID aktif" },
+    { "method": "GET", "path": "/prodi", "query": {}, "note": "Hanya prodi aktif NA=N" },
+    { "method": "GET", "path": "/kurikulum", "query": { "prodi_id": "string optional" } },
+    { "method": "GET", "path": "/dosen", "query": {} },
+    { "method": "GET", "path": "/mahasiswa", "query": {}, "note": "Perluas atau ganti dengan mahasiswa-sync untuk Feeder" },
+    { "method": "GET", "path": "/mata-kuliah", "query": {} },
+    { "method": "GET", "path": "/kelas", "query": { "tahun_id": "string optional" } },
+    { "method": "GET", "path": "/krs", "query": { "tahun_id": "string optional" } },
+    { "method": "GET", "path": "/nilai", "query": { "tahun_id": "string optional" } }
+  ],
+  "proposedEndpoints": [
+    {
+      "method": "GET",
+      "path": "/mahasiswa-sync",
+      "description": "Mahasiswa lengkap untuk biodata + filter SiFeeder",
+      "query": {
+        "program_id": { "type": "string", "required": false, "example": "R" },
+        "prodi_id": { "type": "string", "required": false },
+        "tahun_id": { "type": "string", "required": false, "example": "20251", "description": "Tepat mhsw.TahunID" },
+        "angkatan": { "type": "string", "required": false, "example": "2024", "description": "4 digit pertama mhsw.TahunID" },
+        "status_awal_id": { "type": "string", "required": false, "example": "B" }
+      },
+      "response": {
+        "shape": { "data": "array of MahasiswaSyncRow" },
+        "MahasiswaSyncRow": {
+          "mhsw_id": "string",
+          "nim": "string",
+          "nama": "string",
+          "program_id": "string",
+          "prodi_id": "string",
+          "tahun_id": "string",
+          "status_awal_id": "string",
+          "status_awal_nama": "string|null",
+          "tempat_lahir": "string|null",
+          "tanggal_lahir": "date|null",
+          "jenis_kelamin": "string|null",
+          "nama_ibu_kandung": "string|null",
+          "agama_id_siakad": "string|null",
+          "agama_nama": "string|null",
+          "nik": "string|null",
+          "nisn": "string|null",
+          "email": "string|null",
+          "alamat": "string|null",
+          "kewarganegaraan_kode": "string|null"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/program",
+      "description": "Master program untuk dropdown (hanya NA=N)",
+      "query": {},
+      "response": { "data": [{ "id": "string", "nama": "string" }] }
+    },
+    {
+      "method": "GET",
+      "path": "/status-awal",
+      "description": "Master status awal mahasiswa",
+      "query": {},
+      "response": { "data": [{ "id": "string", "nama": "string" }] }
+    },
+    {
+      "method": "GET",
+      "path": "/khs",
+      "description": "KHS per semester: IP semester (khs.IPS), IPK kumulatif (khs.IP), SKS — untuk InsertPerkuliahanMahasiswa",
+      "siakadColumns": {
+        "khs.IPS": "IP semester → JSON ip_semester → Feeder ips",
+        "khs.IP": "IP kumulatif (IPK) → JSON ipk → Feeder ipk",
+        "khs.SKS": "SKS semester → sks_semester",
+        "khs.TotalSKS": "Total SKS → total_sks",
+        "khs.TahunID": "Semester baris KHS → tahun_id"
+      },
+      "query": {
+        "tahun_id": { "type": "string", "required": true },
+        "program_id": { "type": "string", "required": false },
+        "prodi_id": { "type": "string", "required": false }
+      },
+      "response": {
+        "data": [
+          {
+            "mhsw_id": "string",
+            "nim": "string",
+            "nama": "string",
+            "prodi_id": "string",
+            "program_id": "string",
+            "tahun_id": "string",
+            "ip_semester": "number|null",
+            "ipk": "number|null",
+            "sks_semester": "number|null",
+            "total_sks": "number|null",
+            "biaya": "number|null"
+          }
+        ]
+      },
+      "$comment": "ip_semester = SELECT khs.IPS; ipk = SELECT khs.IP. Legacy CI: Perkuliahan.php record ips from IPS, ipk from IP."
+    },
+    {
+      "method": "GET",
+      "path": "/kelas-peserta",
+      "description": "Peserta + nilai untuk satu kelas (jadwal)",
+      "query": {
+        "jadwal_id": { "type": "string", "required": true },
+        "tahun_id": { "type": "string", "required": false },
+        "prodi_id": { "type": "string", "required": false },
+        "mk_kode": { "type": "string", "required": false },
+        "nama_kelas": { "type": "string", "required": false }
+      },
+      "response": {
+        "data": [
+          {
+            "mhsw_id": "string",
+            "jadwal_id": "string",
+            "tahun_id": "string",
+            "mk_kode": "string|null",
+            "nama_kelas": "string|null",
+            "nilai_angka": "number|null",
+            "nilai_huruf": "string|null",
+            "bobot": "number|null"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/nilai-konversi",
+      "description": "KRS konversi / pindahan: join mk + jadwal + mhsw",
+      "query": {
+        "program_id": { "type": "string", "required": false },
+        "prodi_id": { "type": "string", "required": false },
+        "angkatan": { "type": "string", "required": false, "description": "4 digit tahun masuk (mhsw.TahunID)" },
+        "tahun_krs": { "type": "string", "required": false, "description": "Opsional: semester baris krs.TahunID" },
+        "mhsw_id": { "type": "string", "required": false },
+        "nim": { "type": "string", "required": false },
+        "status_awal_id": { "type": "string", "required": false, "note": "Kosong = default P dan J" }
+      },
+      "response": {
+        "data": [
+          {
+            "krs_id": "string",
+            "mhsw_id": "string",
+            "nim": "string",
+            "nama_mahasiswa": "string",
+            "angkatan": "string",
+            "program_id": "string",
+            "prodi_id": "string",
+            "status_awal_id": "string",
+            "status_awal_nama": "string|null",
+            "tahun_id": "string",
+            "jadwal_id": "string|null",
+            "mk_id": "string|null",
+            "mk_kode": "string|null",
+            "nama_mk": "string|null",
+            "sks_mk": "number|null",
+            "nama_kelas": "string|null",
+            "tahun_jadwal": "string|null",
+            "status_krs": "string|null",
+            "final": "string|null",
+            "nilai_angka": "number|null",
+            "nilai_huruf": "string|null",
+            "bobot": "number|null"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/mahasiswa-keluar",
+      "description": "Mahasiswa lulus / DO untuk InsertMahasiswaLulusDO",
+      "query": {
+        "program_id": { "type": "string", "required": false },
+        "prodi_id": { "type": "string", "required": false },
+        "tahun_id": { "type": "string", "required": false, "description": "Tepat mhsw.TahunID masuk" },
+        "angkatan": { "type": "string", "required": false, "description": "4 digit pertama mhsw.TahunID" },
+        "status_lulus_id": { "type": "string", "required": false }
+      },
+      "response": {
+        "data": [
+          {
+            "mhsw_id": "string",
+            "nim": "string",
+            "nama": "string",
+            "tanggal_keluar": "date|null",
+            "ipk": "number|null",
+            "nomor_ijazah": "string|null",
+            "status_lulus_id": "string|null",
+            "status_lulus_nama": "string|null"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/status-lulus",
+      "description": "Master status lulus/DO",
+      "query": {},
+      "response": { "data": [{ "id": "string", "nama": "string" }] }
+    }
+  ],
+  "sifeederLaravelTables": [
+    "feeder_prodi_maps",
+    "feeder_jenis_daftar_maps",
+    "feeder_agama_maps",
+    "feeder_sync_logs",
+    "feeder_id_cache"
+  ]
+}
