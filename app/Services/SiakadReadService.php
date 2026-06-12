@@ -608,9 +608,16 @@ class SiakadReadService
             return $this->mahasiswaSyncFallback($programId, $prodiId, $tahunId, $angkatan, $statusAwalId, $kodeId, $nims);
         }
 
+        $sksMap = $this->batchSksDiakuiByKrs($this->extractMhswIdsFromRows($rows));
+
         $out = [];
         foreach ($rows as $r) {
-            $out[] = $this->mapMahasiswaSyncRow((array) $r);
+            $a = (array) $r;
+            $mhswId = (string) ($a['mhsw_id'] ?? '');
+            if ($mhswId !== '' && isset($sksMap[$mhswId])) {
+                $a['sks_konversi_sum'] = $sksMap[$mhswId];
+            }
+            $out[] = $this->mapMahasiswaSyncRow($a);
         }
 
         return $out;
@@ -1100,12 +1107,70 @@ class SiakadReadService
             return [];
         }
 
+        $sksMap = $this->batchSksDiakuiByKrs($this->extractMhswIdsFromRows($rows));
+
         $out = [];
         foreach ($rows as $r) {
-            $out[] = $this->mapMahasiswaSyncRow((array) $r);
+            $a = (array) $r;
+            $mhswId = (string) ($a['mhsw_id'] ?? '');
+            if ($mhswId !== '' && isset($sksMap[$mhswId])) {
+                $a['sks_konversi_sum'] = $sksMap[$mhswId];
+            }
+            $out[] = $this->mapMahasiswaSyncRow($a);
         }
 
         return $out;
+    }
+
+    /**
+     * @param  list<object|array<string, mixed>>  $rows
+     * @return list<string>
+     */
+    protected function extractMhswIdsFromRows(array $rows): array
+    {
+        return array_values(array_filter(array_map(
+            fn ($r) => (string) (((array) $r)['mhsw_id'] ?? ''),
+            $rows,
+        )));
+    }
+
+    /**
+     * Total SKS mata kuliah konversi/RPL per mahasiswa (sum SKS baris KRS).
+     *
+     * @param  list<string>  $mhswIds
+     * @return array<string, int>
+     */
+    protected function batchSksDiakuiByKrs(array $mhswIds): array
+    {
+        $mhswIds = array_values(array_filter(array_unique($mhswIds), fn (string $id) => $id !== ''));
+        if ($mhswIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($mhswIds), '?'));
+        $sql = "SELECT k.MhswID AS mhsw_id, COALESCE(SUM(mk.SKS), 0) AS sks_sum
+                FROM krs k
+                INNER JOIN mk ON mk.MKID = k.MKID
+                WHERE k.MhswID IN ({$placeholders})
+                  AND (k.NA = 'N' OR k.NA IS NULL OR k.NA = '')
+                GROUP BY k.MhswID";
+
+        try {
+            $rows = DB::connection('siakad')->select($sql, $mhswIds);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($rows as $r) {
+            $a = (array) $r;
+            $id = (string) ($a['mhsw_id'] ?? '');
+            if ($id !== '') {
+                $map[$id] = max(0, (int) ($a['sks_sum'] ?? 0));
+            }
+        }
+
+        return $map;
     }
 
     /**
@@ -1174,6 +1239,14 @@ class SiakadReadService
         $pindah = trim((string) ($a['total_sks_pindah'] ?? ''));
         if ($pindah !== '' && is_numeric($pindah)) {
             return max(0, (int) $pindah);
+        }
+
+        $statusAwal = (string) ($a['status_awal_id'] ?? '');
+        if (in_array($statusAwal, ['P', 'J'], true)) {
+            $konversi = $a['sks_konversi_sum'] ?? null;
+            if (is_numeric($konversi) && (int) $konversi > 0) {
+                return (int) $konversi;
+            }
         }
 
         $totalSks = $a['total_sks'] ?? null;
