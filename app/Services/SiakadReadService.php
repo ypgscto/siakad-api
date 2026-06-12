@@ -563,7 +563,8 @@ class SiakadReadService
                        m.Kelamin AS kelamin_kode_siakad, kl.Nama AS kelamin_nama,
                        ag.Nama AS agama_nama, m.Agama AS agama_id_siakad,
                        m.Negara AS nik, m.Propinsi AS nisn_placeholder, m.Email AS email, m.Alamat AS alamat,
-                       m.Handphone AS handphone, th.TglKuliahMulai AS tgl_kuliah_mulai, wn.Nama AS warganegara_nama
+                       m.Handphone AS handphone, m.TotalSKSPindah AS total_sks_pindah, m.TotalSKS AS total_sks,
+                       th.TglKuliahMulai AS tgl_kuliah_mulai, wn.Nama AS warganegara_nama
                 FROM mhsw m
                 LEFT JOIN agama ag ON m.Agama = ag.Agama
                 LEFT JOIN kelamin kl ON m.Kelamin = kl.Kelamin
@@ -1062,7 +1063,8 @@ class SiakadReadService
                        TempatLahir AS tempat_lahir, TanggalLahir AS tanggal_lahir, NamaIbu AS nama_ibu_kandung,
                        Kelamin AS kelamin_kode_siakad, NULL AS kelamin_nama, NULL AS agama_nama, Agama AS agama_id_siakad,
                        Negara AS nik, Propinsi AS nisn_placeholder, Email AS email, Alamat AS alamat,
-                       Handphone AS handphone, NULL AS tgl_kuliah_mulai, NULL AS warganegara_nama
+                       Handphone AS handphone, TotalSKSPindah AS total_sks_pindah, TotalSKS AS total_sks,
+                       NULL AS tgl_kuliah_mulai, NULL AS warganegara_nama
                 FROM mhsw
                 WHERE (NA = \'N\' OR NA IS NULL OR NA = \'\')';
         if ($kodeId !== '') {
@@ -1156,9 +1158,30 @@ class SiakadReadService
             'email' => $this->nullableString($a['email'] ?? null),
             'alamat' => $this->nullableString($a['alamat'] ?? null),
             'handphone' => $this->nullableString($a['handphone'] ?? null),
+            'total_sks_pindah' => $this->nullableString($a['total_sks_pindah'] ?? null),
+            'total_sks' => isset($a['total_sks']) && is_numeric($a['total_sks']) ? (int) $a['total_sks'] : null,
+            'sks_diakui' => $this->resolveSksDiakui($a),
             'tgl_kuliah_mulai' => $this->formatDateYmd($a['tgl_kuliah_mulai'] ?? null),
             'warganegara_nama' => $this->nullableString($a['warganegara_nama'] ?? null),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $a
+     */
+    protected function resolveSksDiakui(array $a): ?int
+    {
+        $pindah = trim((string) ($a['total_sks_pindah'] ?? ''));
+        if ($pindah !== '' && is_numeric($pindah)) {
+            return max(0, (int) $pindah);
+        }
+
+        $totalSks = $a['total_sks'] ?? null;
+        if (is_numeric($totalSks) && (int) $totalSks > 0) {
+            return (int) $totalSks;
+        }
+
+        return null;
     }
 
     protected function formatDateYmd(mixed $value): ?string
