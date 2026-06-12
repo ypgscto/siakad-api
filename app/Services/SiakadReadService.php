@@ -393,9 +393,12 @@ class SiakadReadService
         $kodeId = $this->kodeId();
         $params = [];
         $sql = 'SELECT j.JadwalID, j.TahunID, j.MKID, j.DosenID, j.NamaKelas, j.Kapasitas, j.JumlahMhsw,
-                       j.ProdiID, j.ProgramID, mk.MKKode
+                       j.ProdiID, j.ProgramID, mk.MKKode, mk.Nama AS nama_mk,
+                       d.Nama AS nama_dosen, k.Nama AS kelas_nama
                 FROM jadwal j
                 LEFT JOIN mk ON mk.MKID = j.MKID
+                LEFT JOIN dosen d ON d.Login = j.DosenID
+                LEFT JOIN kelas k ON k.KelasID = j.NamaKelas
                 WHERE (j.NA = \'N\' OR j.NA IS NULL OR j.NA = \'\')';
         if ($tahunId) {
             $sql .= ' AND j.TahunID = ?';
@@ -424,12 +427,15 @@ class SiakadReadService
                 'semester_kode' => (string) ($a['TahunID'] ?? ''),
                 'nama_kelas' => $namaKelas,
                 'kode_kelas' => $namaKelas,
+                'kelas_nama' => $this->nullableString($a['kelas_nama'] ?? null),
                 'dosen_login' => isset($a['DosenID']) ? (string) $a['DosenID'] : null,
+                'nama_dosen' => $this->nullableString($a['nama_dosen'] ?? null),
                 'kapasitas' => isset($a['Kapasitas']) ? (int) $a['Kapasitas'] : null,
                 'jumlah_mhsw' => isset($a['JumlahMhsw']) ? (int) $a['JumlahMhsw'] : null,
                 'prodi_kode' => isset($a['ProdiID']) ? (string) $a['ProdiID'] : null,
                 'program_kode' => isset($a['ProgramID']) ? (string) $a['ProgramID'] : null,
                 'mk_kode' => isset($a['MKKode']) ? (string) $a['MKKode'] : null,
+                'nama_mk' => $this->nullableString($a['nama_mk'] ?? null),
             ];
         }
 
