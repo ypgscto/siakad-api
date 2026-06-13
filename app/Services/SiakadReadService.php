@@ -203,8 +203,13 @@ class SiakadReadService
 
     public function dosen(): array
     {
+        $columns = $this->tableColumns('dosen');
+        if ($columns === []) {
+            return [];
+        }
+
         $params = [];
-        $sql = 'SELECT Login, NIDN, NIPPNS, Nama, Homebase, Email, Handphone, NA
+        $sql = 'SELECT '.$this->dosenSelectList($columns).'
                 FROM dosen
                 WHERE '.$this->sqlExcludeNaY();
         $this->appendKodeIdFilter($sql, $params);
@@ -233,7 +238,7 @@ class SiakadReadService
                 'siakad_id' => $login,
                 'nidn' => isset($a['NIDN']) ? (string) $a['NIDN'] : null,
                 'nip' => isset($a['NIPPNS']) ? (string) $a['NIPPNS'] : null,
-                'nama' => (string) ($a['Nama'] ?? ''),
+                'nama' => $this->formatDosenDisplayName($a, $columns),
                 'email' => $email ? (string) $email : null,
                 'prodi_kode' => isset($a['Homebase']) ? (string) $a['Homebase'] : null,
                 'is_active' => $na !== 'Y',
@@ -1394,6 +1399,47 @@ class SiakadReadService
         return null;
     }
 
+    /**
+     * @param  list<string>  $columns
+     */
+    protected function dosenSelectList(array $columns): string
+    {
+        $base = ['Login', 'NIDN', 'NIPPNS', 'Nama', 'Homebase', 'Email', 'Handphone', 'NA'];
+        $seen = array_flip($base);
+
+        foreach (['GelarDepan', 'Gelar', 'GelarBelakang', 'GelarAkhir'] as $candidate) {
+            $col = $this->firstExistingColumn($columns, [$candidate]);
+            if ($col !== null && ! isset($seen[$col])) {
+                $base[] = $col;
+                $seen[$col] = true;
+            }
+        }
+
+        return implode(', ', array_map(static fn (string $column): string => '`'.$column.'`', $base));
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  list<string>  $columns
+     */
+    protected function formatDosenDisplayName(array $row, array $columns): string
+    {
+        $depanCol = $this->firstExistingColumn($columns, ['GelarDepan', 'Gelar', 'Prefix']);
+        $belakangCol = $this->firstExistingColumn($columns, ['GelarBelakang', 'GelarAkhir', 'Suffix']);
+
+        $depan = $depanCol !== null ? trim((string) ($row[$depanCol] ?? '')) : '';
+        $belakang = $belakangCol !== null ? trim((string) ($row[$belakangCol] ?? '')) : '';
+        $nama = trim((string) ($row['Nama'] ?? $row['name'] ?? ''));
+
+        $display = trim($depan !== '' ? $depan.' '.$nama : $nama);
+
+        if ($belakang !== '') {
+            $display = $display !== '' ? $display.', '.$belakang : $belakang;
+        }
+
+        return $display !== '' ? $display : '—';
+    }
+
     protected function guessJenisSemester(string $tahunId): ?string
     {
         $last = substr($tahunId, -1);
@@ -1601,7 +1647,7 @@ class SiakadReadService
         $nuptkFragment = $nuptkCol !== null ? sprintf('`%s` AS NUPTK', $nuptkCol) : 'NULL AS NUPTK';
         $dosenIdFragment = $dosenIdCol !== null ? sprintf('`%s` AS DosenID', $dosenIdCol) : 'NULL AS DosenID';
 
-        $sql = 'SELECT Login, NIDN, NIPPNS, '.$nuptkFragment.', '.$dosenIdFragment.', Nama, Homebase, Email, Handphone, NA
+        $sql = 'SELECT '.$nuptkFragment.', '.$dosenIdFragment.', '.$this->dosenSelectList($columns).'
                 FROM dosen
                 WHERE '.$this->sqlExcludeNaY();
         $this->appendKodeIdFilter($sql, $params);
@@ -1627,7 +1673,7 @@ class SiakadReadService
                 'nidn' => isset($a['NIDN']) ? (string) $a['NIDN'] : null,
                 'nip' => isset($a['NIPPNS']) ? (string) $a['NIPPNS'] : null,
                 'nuptk' => isset($a['NUPTK']) ? $this->nullableString($a['NUPTK']) : null,
-                'nama' => (string) ($a['Nama'] ?? ''),
+                'nama' => $this->formatDosenDisplayName($a, $columns),
                 'email' => $this->nullableString($a['Email'] ?? null),
                 'handphone' => $this->nullableString($a['Handphone'] ?? null),
                 'prodi_kode' => isset($a['Homebase']) ? (string) $a['Homebase'] : null,
