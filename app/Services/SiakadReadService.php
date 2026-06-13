@@ -203,34 +203,31 @@ class SiakadReadService
 
     public function dosen(): array
     {
-        $kodeId = $this->kodeId();
         $params = [];
         $sql = 'SELECT Login, NIDN, NIPPNS, Nama, Homebase, Email, Handphone, NA
                 FROM dosen
-                WHERE (NA = \'N\' OR NA IS NULL OR NA = \'\')';
-        if ($kodeId !== '') {
-            $sql .= ' AND KodeID = ?';
-            $params[] = $kodeId;
-        }
+                WHERE '.$this->sqlExcludeNaY();
+        $this->appendKodeIdFilter($sql, $params);
         $sql .= ' ORDER BY Login';
 
         try {
             $rows = DB::connection('siakad')->select($sql, $params);
         } catch (\Throwable) {
-            $rows = $this->dosenFallback($kodeId);
+            $rows = $this->dosenFallback($this->kodeId());
         }
 
         $out = [];
         foreach ($rows as $r) {
             $a = (array) $r;
-            $login = (string) ($a['Login'] ?? '');
-            if ($login === '') {
+            $login = $this->resolveDosenSiakadId($a);
+            if ($login === null) {
                 continue;
             }
             $email = $a['Email'] ?? null;
             if (($email === null || $email === '') && isset($a['Handphone'])) {
                 $email = $a['Handphone'] !== '' ? (string) $a['Handphone'] : null;
             }
+            $na = strtoupper(trim((string) ($a['NA'] ?? 'N')));
             $out[] = [
                 'id' => $login,
                 'siakad_id' => $login,
@@ -239,7 +236,7 @@ class SiakadReadService
                 'nama' => (string) ($a['Nama'] ?? ''),
                 'email' => $email ? (string) $email : null,
                 'prodi_kode' => isset($a['Homebase']) ? (string) $a['Homebase'] : null,
-                'is_active' => true,
+                'is_active' => $na !== 'Y',
             ];
         }
 
@@ -252,9 +249,9 @@ class SiakadReadService
     protected function dosenFallback(string $kodeId): array
     {
         $params = [];
-        $sql = 'SELECT Login, NIDN, Nama, Homebase, NA FROM dosen WHERE (NA = \'N\' OR NA IS NULL OR NA = \'\')';
+        $sql = 'SELECT Login, NIDN, Nama, Homebase, NA FROM dosen WHERE '.$this->sqlExcludeNaY();
         if ($kodeId !== '') {
-            $sql .= ' AND KodeID = ?';
+            $sql .= ' AND (KodeID = ? OR KodeID IS NULL OR KodeID = \'\')';
             $params[] = $kodeId;
         }
         $sql .= ' ORDER BY Login';
@@ -1353,6 +1350,50 @@ class SiakadReadService
         return trim((string) config('siakad_api.kode_id', ''));
     }
 
+    /**
+     * Baris aktif: semua kecuali NA = 'Y' (nonaktif).
+     */
+    protected function sqlExcludeNaY(string $column = 'NA'): string
+    {
+        return sprintf(
+            '(%1$s IS NULL OR TRIM(%1$s) = \'\' OR UPPER(TRIM(%1$s)) <> \'Y\')',
+            $column,
+        );
+    }
+
+    /**
+     * @param  list<mixed>  $params
+     */
+    protected function appendKodeIdFilter(string &$sql, array &$params, string $column = 'KodeID'): void
+    {
+        $kodeId = $this->kodeId();
+        if ($kodeId === '') {
+            return;
+        }
+
+        $sql .= sprintf(' AND (%1$s = ? OR %1$s IS NULL OR %1$s = \'\')', $column);
+        $params[] = $kodeId;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    protected function resolveDosenSiakadId(array $row): ?string
+    {
+        foreach (['Login', 'NIDN', 'NIPPNS', 'NUPTK', 'DosenID'] as $key) {
+            if (! array_key_exists($key, $row)) {
+                continue;
+            }
+
+            $value = trim((string) ($row[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
     protected function guessJenisSemester(string $tahunId): ?string
     {
         $last = substr($tahunId, -1);
@@ -1555,17 +1596,15 @@ class SiakadReadService
         }
 
         $nuptkCol = $this->firstExistingColumn($columns, ['NUPTK', 'Nuptk', 'nuptk']);
-        $kodeId = $this->kodeId();
+        $dosenIdCol = $this->firstExistingColumn($columns, ['DosenID', 'DosenId', 'dosen_id']);
         $params = [];
         $nuptkFragment = $nuptkCol !== null ? sprintf('`%s` AS NUPTK', $nuptkCol) : 'NULL AS NUPTK';
+        $dosenIdFragment = $dosenIdCol !== null ? sprintf('`%s` AS DosenID', $dosenIdCol) : 'NULL AS DosenID';
 
-        $sql = 'SELECT Login, NIDN, NIPPNS, '.$nuptkFragment.', Nama, Homebase, Email, Handphone, NA
+        $sql = 'SELECT Login, NIDN, NIPPNS, '.$nuptkFragment.', '.$dosenIdFragment.', Nama, Homebase, Email, Handphone, NA
                 FROM dosen
-                WHERE (NA = \'N\' OR NA IS NULL OR NA = \'\')';
-        if ($kodeId !== '') {
-            $sql .= ' AND KodeID = ?';
-            $params[] = $kodeId;
-        }
+                WHERE '.$this->sqlExcludeNaY();
+        $this->appendKodeIdFilter($sql, $params);
         $sql .= ' ORDER BY Login';
 
         try {
@@ -1577,8 +1616,8 @@ class SiakadReadService
         $out = [];
         foreach ($rows as $r) {
             $a = (array) $r;
-            $login = (string) ($a['Login'] ?? '');
-            if ($login === '') {
+            $login = $this->resolveDosenSiakadId($a);
+            if ($login === null) {
                 continue;
             }
             $na = strtoupper(trim((string) ($a['NA'] ?? 'N')));
@@ -1592,7 +1631,7 @@ class SiakadReadService
                 'email' => $this->nullableString($a['Email'] ?? null),
                 'handphone' => $this->nullableString($a['Handphone'] ?? null),
                 'prodi_kode' => isset($a['Homebase']) ? (string) $a['Homebase'] : null,
-                'is_active' => $na === 'N' || $na === '',
+                'is_active' => $na !== 'Y',
             ];
         }
 

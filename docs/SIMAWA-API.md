@@ -73,7 +73,12 @@ Daftar akun Siakad yang boleh disinkronkan ke SIMAWA-GS (pegawai, dosen, mahasis
 
 Login aplikasi tetap memakai `POST /api/auth/login-app` (verifikasi password di database Siakad).
 
-### Parameter `status`
+### `/api/simawa/dosen`
+
+- Hanya baris dengan **NA ≠ 'Y'** (nonaktif di Siakad).
+- Jika `SIAKAD_KODE_ID` di `.env` siakad-api terisi, dosen dengan `KodeID` kosong tetap ikut (selaras endpoint lain).
+- Identitas: `Login`, fallback `NIDN` / `NIPPNS` / `NUPTK` / `DosenID`.
+
 
 - **tahun-akademik:** `aktif` / `nonaktif` (kolom `tahun.NA`)
 - **mahasiswa:** `StatusMhswID` (atau `StatusAwalID` jika kolom status mhsw tidak ada)
