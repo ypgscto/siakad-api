@@ -78,7 +78,7 @@ Login aplikasi tetap memakai `POST /api/auth/login-app` (verifikasi password di 
 - Hanya baris dengan **NA ≠ 'Y'** (nonaktif di Siakad).
 - Jika `SIAKAD_KODE_ID` di `.env` siakad-api terisi, dosen dengan `KodeID` kosong tetap ikut (selaras endpoint lain).
 - Identitas: `Login`, fallback `NIDN` / `NIPPNS` / `NUPTK` / `DosenID`.
-- **Nama** digabung dari kolom gelar jika ada (`GelarDepan`/`Gelar` + `Nama` + `GelarBelakang`/`GelarAkhir`). Setiap sync SIMAWA memperbarui nama, email, HP, dan homebase prodi.
+- **Nama** = `Nama` diikuti gelar **setelah koma** (mis. `Subekti Ahmad, Dr., S.Kep., M.Kep`) dari kolom `GelarDepan`, `Gelar`, `GelarBelakang`, `GelarAkhir` jika ada.
 
 
 - **tahun-akademik:** `aktif` / `nonaktif` (kolom `tahun.NA`)

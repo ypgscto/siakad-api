@@ -1424,20 +1424,33 @@ class SiakadReadService
      */
     protected function formatDosenDisplayName(array $row, array $columns): string
     {
-        $depanCol = $this->firstExistingColumn($columns, ['GelarDepan', 'Gelar', 'Prefix']);
-        $belakangCol = $this->firstExistingColumn($columns, ['GelarBelakang', 'GelarAkhir', 'Suffix']);
-
-        $depan = $depanCol !== null ? trim((string) ($row[$depanCol] ?? '')) : '';
-        $belakang = $belakangCol !== null ? trim((string) ($row[$belakangCol] ?? '')) : '';
         $nama = trim((string) ($row['Nama'] ?? $row['name'] ?? ''));
 
-        $display = trim($depan !== '' ? $depan.' '.$nama : $nama);
+        $gelarParts = [];
+        $usedColumns = [];
 
-        if ($belakang !== '') {
-            $display = $display !== '' ? $display.', '.$belakang : $belakang;
+        foreach (['GelarDepan', 'Gelar', 'GelarBelakang', 'GelarAkhir'] as $candidate) {
+            $col = $this->firstExistingColumn($columns, [$candidate]);
+            if ($col === null || in_array($col, $usedColumns, true)) {
+                continue;
+            }
+
+            $usedColumns[] = $col;
+            $value = trim((string) ($row[$col] ?? ''));
+            if ($value !== '') {
+                $gelarParts[] = $value;
+            }
         }
 
-        return $display !== '' ? $display : '—';
+        if ($nama === '') {
+            return $gelarParts !== [] ? implode(', ', $gelarParts) : '—';
+        }
+
+        if ($gelarParts === []) {
+            return $nama;
+        }
+
+        return $nama.', '.implode(', ', $gelarParts);
     }
 
     protected function guessJenisSemester(string $tahunId): ?string
